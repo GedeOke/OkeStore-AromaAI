@@ -1,6 +1,18 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
-export async function sendChat(message, sessionId = "frontend") {
+/**
+ * Service untuk memanggil endpoint chatbot FastAPI.
+ * Request: { message, session_id }
+ * Response: { reply, intent, context_used }
+ */
+export async function sendChat(message, sessionId) {
+  const trimmed = message?.trim();
+
+  if (!trimmed) {
+    throw new Error("Pesan tidak boleh kosong.");
+  }
+
   try {
     const response = await fetch(`${API_BASE}/chat`, {
       method: "POST",
@@ -8,22 +20,30 @@ export async function sendChat(message, sessionId = "frontend") {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        message,
+        message: trimmed,
         session_id: sessionId,
       }),
     });
 
     if (!response.ok) {
-      throw new Error("Server error");
+      let detail = "Terjadi kesalahan pada server.";
+
+      try {
+        const errorData = await response.json();
+        if (errorData?.detail) {
+          detail = errorData.detail;
+        }
+      } catch {
+        // Abaikan jika parsing error body gagal
+      }
+
+      throw new Error(detail);
     }
 
     return await response.json();
-  } catch (err) {
-    console.error("API error:", err);
-    return {
-      reply: "⚠️ Tidak dapat menghubungi server.",
-      intent: "ERROR",
-      context_used: [],
-    };
+  } catch (error) {
+    console.error("API error:", error);
+    throw new Error("Terjadi kesalahan, coba lagi nanti.");
   }
 }
+
